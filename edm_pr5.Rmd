@@ -1,0 +1,140 @@
+---
+title: "XAI3"
+output: html_document
+---
+
+David Beltrán Pozo
+
+Eloy Olmeda Fauvert
+
+Lluís Pellicer Juan
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(reshape2)
+library(plotly)
+library(fairness)
+library(dplyr)
+library(partykit)
+library(pre)
+library(randomForest)
+library(pdp)
+
+```
+
+
+## EXERCISE 1
+
+```{r}
+day = read.csv("C:/Users/eloyo/OneDrive/Documentos/Ciencia de Datos/Tercero/Segundo cuatri/EDM/Practicas/Practica 3/Bike-Sharing-Dataset/day.csv")
+
+# MISTY
+day$misty = ifelse(day$weathersit == 2, 1, 0)
+
+# RAIN
+day$rain = ifelse(day$weathersit %in% c(3,4), 1, 0)
+
+# One-hot encoding for season
+day <- day %>%
+  mutate(
+    winter = ifelse(season == 1, 1, 0),
+    spring = ifelse(season == 2, 1, 0),
+    summer = ifelse(season == 3, 1, 0)
+  )
+
+# temp, hum, windspeed
+tmin = -8
+tmax = 39
+day$temp = (day$temp*(tmax-tmin))+tmin
+day$hum = day$hum*100
+day$windspeed = day$windspeed*67
+
+# days_since_2011
+day$dteday = as.Date(day$dteday)
+start_date = as.Date("2011-01-01")
+day$days_since_2011 = as.numeric(day$dteday - start_date)
+```
+
+
+```{r}
+predictors <- day[, c("workingday", "holiday", "spring", "summer","winter", "misty", "rain", "temp", "hum", "windspeed", "days_since_2011")]
+
+target <- day$cnt
+
+# Train random forest model
+rf_model <- randomForest(predictors, target, ntree=100, importance=TRUE)
+
+# Create PDP for each interest variable
+pdp_wind <- partial(rf_model, pred.var = "windspeed", plot = TRUE, plot.engine = "ggplot2") + ylab("Predicted number of bike rentals") + scale_y_continuous(limits = c(0, 6000))
+
+pdp_hum <- partial(rf_model, pred.var = "hum", plot = TRUE, 
+                   plot.engine = "ggplot2") + ylab("Predicted number of bike rentals") + scale_y_continuous(limits = c(0, 6000))
+
+pdp_temp <- partial(rf_model, pred.var = "temp", plot = TRUE,plot.engine = "ggplot2") + ylab("Predicted number of bike rentals") + scale_y_continuous(limits = c(0, 6000))
+
+pdp_2011 <- partial(rf_model, pred.var = "days_since_2011", plot = TRUE, plot.engine = "ggplot2") + ylab("Predicted number of bike rentals") + scale_y_continuous(limits = c(0, 6000))
+
+plot(pdp_wind)
+plot(pdp_hum)
+plot(pdp_temp)
+plot(pdp_2011)
+```
+
+
+## EXERCISE 2
+
+```{r}
+# Extract a set of random samples from the BBDD before generating the data for the Partial Dependency Plot. 
+bike_sample <- day %>% sample_n(size = 400, replace = FALSE)
+
+
+predictors_sample <- bike_sample[, c("workingday", "holiday", "spring", "summer","winter", "misty", "rain", "temp", "hum", "windspeed", "days_since_2011")]
+
+target_sample <- bike_sample$cnt
+
+# Fit random forest model
+rf_model_sample <- randomForest(predictors_sample, target_sample, ntree=100, importance=TRUE)
+
+# Generate PDP
+bike_pdp <- partial(rf_model_sample, pred.var = c("hum", "temp"), grid.resolution = 25, plot = TRUE, plot.engine = "ggplot2") + geom_tile(width = 0.1, height = 0.1) + scale_fill_gradientn(colors = c("blue", "green", "yellow", "red")) + labs(title = "Partial Dependence Plot for Bike Rentals", x = "Humidity", y = "Temperature", fill = "Predicted Bikes Rented")
+
+bike_pdp
+
+```
+
+
+## EXERCISE 3
+
+```{r}
+house_sample_price <- read.csv("C:/Users/eloyo/OneDrive/Documentos/Ciencia de Datos/Tercero/Segundo cuatri/EDM/Practicas/Practica 5/kc_house_data.csv")
+
+house_sample <- house_sample_price %>% sample_n(10000)
+
+predictors_house <- house_sample[, c("bedrooms", "bathrooms", "sqft_living", "sqft_lot", "floors", "yr_built")]
+
+target_house <- house_sample$price
+
+rf_house <- randomForest(predictors_house, target_house, ntree=100, importance=TRUE)
+
+# PDP plot
+
+pdp_bed <- partial(rf_house, pred.var = "bedrooms", plot = TRUE, plot.engine = "ggplot2") + ylab("Price")
+
+pdp_bath <- partial(rf_house, pred.var = "bathrooms", plot = TRUE, 
+                   plot.engine = "ggplot2") + ylab("Price")
+
+pdp_sqft <- partial(rf_house, pred.var = "sqft_living", plot = TRUE,plot.engine = "ggplot2") + ylab("Price")
+
+pdp_floors <- partial(rf_house, pred.var = "floors", plot = TRUE, plot.engine = "ggplot2") + ylab("Price")
+
+plot(pdp_bed)
+plot(pdp_bath)
+plot(pdp_sqft)
+plot(pdp_floors)
+
+
+
+```
+
+
+
