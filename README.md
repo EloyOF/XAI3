@@ -4,4 +4,4 @@ Members of the group:
   - Eloy Olmeda Fauvert
   - Lluís Pellicer Juan
 
-This branch contains the files uploades manually using "Add file".
+This branch contains the files uploaded manually using "Add file".
